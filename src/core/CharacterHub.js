@@ -1128,29 +1128,65 @@ export class CharacterHub {
       body.appendChild(node);
     };
 
+    /*
+     * ミッションデータはセーブデータの世代によって
+     * 欠落している可能性がある。
+     *
+     * 現在の CharacterSystem では
+     * daily / weekly は summary.missions、
+     * event は summary.event に入っている。
+     *
+     * そのため summary.missions.event.progress を
+     * 直接読むと「Cannot read properties of undefined」
+     * になる。
+     */
+    const missions = summary.missions || {};
+
+    const daily = missions.daily || {
+      progress: 0,
+      claimed: false
+    };
+
+    const weekly = missions.weekly || {
+      progress: 0,
+      claimed: false
+    };
+
+    const event =
+      summary.event ||
+      missions.event || {
+        progress: 0,
+        claimed: false
+      };
+
     addMission(
       'デイリー：曲を3回クリア',
-      summary.missions.daily.progress,
+      Number(daily.progress) || 0,
       3,
-      summary.missions.daily.claimed,
+      Boolean(daily.claimed),
       () => characterSystem.claimDaily()
     );
 
     addMission(
       'ウィークリー：曲を10回クリア',
-      summary.missions.weekly.progress,
+      Number(weekly.progress) || 0,
       10,
-      summary.missions.weekly.claimed,
+      Boolean(weekly.claimed),
       () => characterSystem.claimWeekly()
     );
 
     addMission(
       'イベント：曲を7回クリア',
-      summary.missions.event.progress,
+      Number(event.progress) || 0,
       7,
-      summary.missions.event.claimed,
+      Boolean(event.claimed),
       () => characterSystem.claimEvent()
     );
+
+    const loginData = summary.login || {
+      streak: 0,
+      claimedToday: false
+    };
 
     const login =
       document.createElement('div');
@@ -1163,19 +1199,19 @@ export class CharacterHub {
 
       <div class="ch-muted">
         連続ログイン
-        ${summary.login.streak}日
+        ${Number(loginData.streak) || 0}日
       </div>
 
       <button
         class="ch-bigbtn"
         ${
-          summary.login.claimedToday
+          loginData.claimedToday
             ? 'disabled'
             : ''
         }
       >
         ${
-          summary.login.claimedToday
+          loginData.claimedToday
             ? '本日受取済み'
             : '今日の報酬を受け取る'
         }
