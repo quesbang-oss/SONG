@@ -147,6 +147,10 @@ export class PlaySession {
     this._loop =
       this._loop.bind(this);
 
+    // 曲の自然終了をプレイセッションのクリアとして扱う。
+    this._onAudioEnded =
+      this._onAudioEnded.bind(this);
+
     characterSystem.beginBattle();
 
     audioManager.setBuffer(
@@ -203,6 +207,11 @@ export class PlaySession {
     bus.on(
       'input:laneup',
       this._onLaneUp
+    );
+
+    bus.on(
+      'audio:ended',
+      this._onAudioEnded
     );
 
     this.inputManager.attach();
@@ -268,6 +277,30 @@ export class PlaySession {
       'input:laneup',
       this._onLaneUp
     );
+
+    bus.off(
+      'audio:ended',
+      this._onAudioEnded
+    );
+  }
+
+  /**
+   * AudioManagerから曲の自然終了を受け取る。
+   * プレイヤーが生存している状態で曲が最後まで再生された場合はクリア。
+   * _endedで二重終了を防ぐ。
+   */
+  _onAudioEnded() {
+    if (
+      !this._running ||
+      this._ended ||
+      this._paused
+    ) {
+      return;
+    }
+
+    this._ended = true;
+
+    this._finish(true);
   }
 
   // ---------- 入力処理 ----------
