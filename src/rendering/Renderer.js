@@ -253,14 +253,36 @@ export class Renderer {
     const ctx = this.ctx;
     const PASS_THROUGH_LIMIT = 1.6; // 判定ラインを越えた後、画面外へ抜けるまで描画を続ける範囲
 
-    // HOLDノーツの帯（頭と尾を結ぶカラフルなトレイル）を先に描画
-    for (const note of notes) {
-      if (note.type !== NOTE_TYPES.HOLD || note.hit || note.missed) continue;
-      const headProgress = 1 - (note.time - nowSec) / approachSec;
-      const tailProgress = 1 - (note.endTime - nowSec) / approachSec;
-      if (headProgress < -0.1 && tailProgress < -0.1) continue;
-      this._drawHoldTrail(ctx, note, Math.max(-0.05, headProgress), Math.max(-0.05, tailProgress), note.holdActive);
-    }
+    // HOLDノーツ
+for (const note of notes) {
+  if (note.type !== NOTE_TYPES.HOLD || note.hit || note.missed) continue;
+
+  const headProgress = 1 - (note.time - nowSec) / approachSec;
+  const tailProgress = 1 - (note.endTime - nowSec) / approachSec;
+
+  if (headProgress < -0.1 && tailProgress < -0.1) continue;
+
+  // 長押し中は「現在位置より先」だけを表示する。
+  // つまり、すでに押し切った部分は消えていく。
+  const visibleHeadProgress = note.holdActive
+    ? Math.max(1, headProgress)
+    : Math.max(-0.05, headProgress);
+
+  const visibleTailProgress = Math.max(-0.05, tailProgress);
+
+  // すでに終点まで到達していたら描画しない
+  if (note.holdActive && visibleHeadProgress >= visibleTailProgress) {
+    continue;
+  }
+
+  this._drawHoldTrail(
+    ctx,
+    note,
+    visibleHeadProgress,
+    visibleTailProgress,
+    note.holdActive
+  );
+}
 
     for (const note of notes) {
       if (note.hit || note.missed) continue;
