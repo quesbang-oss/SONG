@@ -116,6 +116,9 @@ export class StageManager {
       clears: 0,
       imported: true
     };
+    // 受け取った共有ステージを自分のステージ一覧にも保存する。
+    // これにより共有URLを開くだけでMY STAGESからすぐ遊べる。
+    saveManager.saveStage(stage);
     saveManager.publishToCommunity(stage);
     return stage;
   }
