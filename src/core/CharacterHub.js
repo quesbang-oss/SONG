@@ -1,36 +1,15 @@
 import { bus } from '../utils/EventBus.js';
 import { characterSystem } from './CharacterSystem.js';
 import { gameState } from './GameState.js';
-
-/*
- * キャラクター画像の解決。
- *
- * CharacterHub.js は src/core/ にあるため、
- * src/assets/ に置かれている画像は import.meta.glob() で
- * Vite に実ファイルとして認識させる。
- *
- * これなら base: './' の影響で
- * ./assets/foo.png → SONG/assets/foo.png
- * のようにURLだけを推測して404になる問題を避けられる。
- *
- * public/assets/ にある場合は後半の相対URLもフォールバックとして使用する。
- */
-const CHARACTER_IMAGE_ASSETS = import.meta.glob(
-  '../assets/**/*.{png,jpg,jpeg,webp,gif}',
-  {
-    eager: true,
-    query: '?url',
-    import: 'default'
-  }
-);
-
-const CHARACTER_IMAGE_BY_NAME = new Map(
-  Object.entries(CHARACTER_IMAGE_ASSETS).map(([path, url]) => [
-    path.split('/').pop().toLowerCase(),
-    url
-  ])
-);
-
+import img_arukarasu from '../assets/arukarasu.png';
+import img_datyou from '../assets/datyou.png';
+import img_dossunmitta from '../assets/dossunmitta.jpg';
+import img_kangaemitta from '../assets/kangaemitta.jpg';
+import img_keikakudoori from '../assets/keikakudoori.jpg';
+import img_kiokunasi from '../assets/kiokunasi.jpg';
+import img_kureteyaru from '../assets/kureteyaru.jpg';
+import img_mewotuketeru from '../assets/mewotuketeru.png';
+import img_mittasan from '../assets/mittasan.jpg';
 
 const TYPE_LABEL = {
   HP: 'HP特化',
@@ -65,7 +44,6 @@ function resolveAssetUrl(assetPath) {
     return '';
   }
 
-  // 外部URL / data / blob はそのまま。
   if (
     value.startsWith('data:') ||
     value.startsWith('blob:') ||
@@ -76,33 +54,28 @@ function resolveAssetUrl(assetPath) {
   }
 
   /*
-   * ファイル名だけを取り出して src/assets の実ファイルを探す。
-   * 例:
-   * ./assets/arukarasu.png
-   * assets/arukarasu.png
-   * arukarasu.png
-   * のどれでも arukarasu.png として検索できる。
+   * キャラクター画像は静的import済み。
+   * Viteが実ファイルを検出してbuild時に正しいURLへ変換するため、
+   * base:'./' や GitHub Pages のサブパスに依存しない。
    */
   const fileName = value
     .split('/')
     .pop()
     .toLowerCase();
 
-  const bundledUrl = CHARACTER_IMAGE_BY_NAME.get(fileName);
+  const imageMap = {
+    'arukarasu.png': img_arukarasu,
+    'datyou.png': img_datyou,
+    'dossunmitta.jpg': img_dossunmitta,
+    'kangaemitta.jpg': img_kangaemitta,
+    'keikakudoori.jpg': img_keikakudoori,
+    'kiokunasi.jpg': img_kiokunasi,
+    'kureteyaru.jpg': img_kureteyaru,
+    'mewotuketeru.png': img_mewotuketeru,
+    'mittasan.jpg': img_mittasan
+  };
 
-  if (bundledUrl) {
-    return bundledUrl;
-  }
-
-  /*
-   * src/assets に見つからない場合は public/assets を想定。
-   * Vite の base: './' なので、ここでは絶対パスに固定しない。
-   */
-  const cleanFileName = value
-    .replace(/^\.?\//, '')
-    .replace(/^assets\//, '');
-
-  return `./assets/${cleanFileName}`;
+  return imageMap[fileName] || value;
 }
 
 function skillTriggerText(skill) {
@@ -760,32 +733,7 @@ export class CharacterHub {
          * 404画像をそのまま表示せず、
          * プレースホルダーへ切り替える。
          */
-        let imageErrorCount = 0;
-
         image.onerror = () => {
-          imageErrorCount += 1;
-
-          /*
-           * src/assets のglob URLで失敗した場合だけ、
-           * public/assets 用の相対URLを1回試す。
-           */
-          const fallbackUrl = `./assets/${
-            String(character.image)
-              .split('/')
-              .pop()
-          }`;
-
-          if (
-            imageErrorCount === 1 &&
-            image.src !== new URL(
-              fallbackUrl,
-              window.location.href
-            ).href
-          ) {
-            image.src = fallbackUrl;
-            return;
-          }
-
           image.replaceWith(
             this._createImageFallback(
               character.name
@@ -1119,17 +1067,13 @@ export class CharacterHub {
       node.className =
         'ch-mission';
 
-      const safeProgress = Number.isFinite(Number(progress))
-        ? Math.max(0, Number(progress))
-        : 0;
       const safeMax =
-        Math.max(1, Number(max) || 1);
-      const safeClaimed = Boolean(claimed);
+        Math.max(1, max);
 
       const percentage =
         Math.min(
           100,
-          (safeProgress / safeMax) * 100
+          (progress / safeMax) * 100
         );
 
       node.innerHTML = `
@@ -1143,20 +1087,20 @@ export class CharacterHub {
 
         <div class="ch-row">
           <span>
-            ${safeProgress} / ${safeMax}
+            ${progress} / ${max}
           </span>
 
           <button
             class="mission-claim-button"
             ${
-              safeClaimed ||
-              safeProgress < safeMax
+              claimed ||
+              progress < max
                 ? 'disabled'
                 : ''
             }
           >
             ${
-              safeClaimed
+              claimed
                 ? '受取済み'
                 : '受け取る'
             }
@@ -1184,57 +1128,29 @@ export class CharacterHub {
       body.appendChild(node);
     };
 
-    // セーブデータや旧バージョンのデータが残っていても
-    // ミッション画面自体がクラッシュしないよう、ここで完全に正規化する。
-    // CharacterSystem の現在の仕様では event は missions の外にある。
-    const missions = summary?.missions || {};
-    const daily = missions.daily || {};
-    const weekly = missions.weekly || {};
-    const event = summary?.event || missions.event || {};
-
-    const dailyProgress = Number.isFinite(Number(daily.progress))
-      ? Number(daily.progress)
-      : 0;
-    const weeklyProgress = Number.isFinite(Number(weekly.progress))
-      ? Number(weekly.progress)
-      : 0;
-    const eventProgress = Number.isFinite(Number(event.progress))
-      ? Number(event.progress)
-      : 0;
-
-    const dailyClaimed = Boolean(daily.claimed);
-    const weeklyClaimed = Boolean(weekly.claimed);
-    const eventClaimed = Boolean(event.claimed);
-
     addMission(
       'デイリー：曲を3回クリア',
-      dailyProgress,
+      summary.missions.daily.progress,
       3,
-      dailyClaimed,
+      summary.missions.daily.claimed,
       () => characterSystem.claimDaily()
     );
 
     addMission(
       'ウィークリー：曲を10回クリア',
-      weeklyProgress,
+      summary.missions.weekly.progress,
       10,
-      weeklyClaimed,
+      summary.missions.weekly.claimed,
       () => characterSystem.claimWeekly()
     );
 
     addMission(
       'イベント：曲を7回クリア',
-      eventProgress,
+      summary.missions.event.progress,
       7,
-      eventClaimed,
+      summary.missions.event.claimed,
       () => characterSystem.claimEvent()
     );
-
-    const loginData = summary?.login || {};
-    const loginStreak = Number.isFinite(Number(loginData.streak))
-      ? Math.max(0, Number(loginData.streak))
-      : 0;
-    const loginClaimedToday = Boolean(loginData.claimedToday);
 
     const login =
       document.createElement('div');
@@ -1247,19 +1163,19 @@ export class CharacterHub {
 
       <div class="ch-muted">
         連続ログイン
-        ${loginStreak}日
+        ${summary.login.streak}日
       </div>
 
       <button
         class="ch-bigbtn"
         ${
-          loginClaimedToday
+          summary.login.claimedToday
             ? 'disabled'
             : ''
         }
       >
         ${
-          loginClaimedToday
+          summary.login.claimedToday
             ? '本日受取済み'
             : '今日の報酬を受け取る'
         }
