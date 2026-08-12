@@ -1,6 +1,7 @@
 import './style.css';
 import { UI } from './rendering/UI.js';
 import { gameState } from './core/GameState.js';
+import { CharacterHub } from './core/CharacterHub.js';
 
 /**
  * アプリケーションのブートストラップ。
@@ -8,15 +9,37 @@ import { gameState } from './core/GameState.js';
  */
 function bootstrap() {
   window.addEventListener('error', (e) => {
-    console.error('[YCSB] Uncaught error:', e.error || e.message);
-  });
-  window.addEventListener('unhandledrejection', (e) => {
-    console.error('[YCSB] Unhandled promise rejection:', e.reason);
+    console.error(
+      '[YCSB] Uncaught error:',
+      e.error || e.message
+    );
   });
 
-  const ui = new UI();
-  window.__ycsbUI = ui; // デバッグ用
-  gameState.goto('MENU');
+  window.addEventListener(
+    'unhandledrejection',
+    (e) => {
+      console.error(
+        '[YCSB] Unhandled promise rejection:',
+        e.reason
+      );
+    }
+  );
+
+  const ui =
+    new UI();
+
+  const characterHub =
+    new CharacterHub();
+
+  window.__ycsbUI =
+    ui;
+
+  window.__ycsbCharacterHub =
+    characterHub;
+
+  gameState.goto(
+    'MENU'
+  );
 }
 
 bootstrap();
