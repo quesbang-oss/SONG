@@ -34,13 +34,13 @@ export class KeyboardInput {
     if (lane === -1) return;
     if (this._pressed.has(lane)) return; // オートリピート無効化
     this._pressed.add(lane);
-    this.onLaneDown(lane);
+    this.onLaneDown(lane, e.timeStamp);
   }
 
   _handleKeyUp(e) {
     const lane = this.keymap.indexOf(e.code);
     if (lane === -1) return;
     this._pressed.delete(lane);
-    this.onLaneUp(lane);
+    this.onLaneUp(lane, e.timeStamp);
   }
 }
