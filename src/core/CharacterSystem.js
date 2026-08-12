@@ -1,3 +1,10 @@
+// 変更ファイル: src/core/CharacterSystem.js
+// 仕様:
+// - スキル条件値は最低20（combo / hits / perfect）
+// - 条件値の倍数ごとに同一演奏中何度でも発動
+// - comboはコンボが切れた後、再び条件値に到達すれば再発動
+// - 画像パス、CharacterHub、ミッション処理は変更していません
+
 import characterData from '../data/characters.json';
 import { bus } from '../utils/EventBus.js';
 import { saveManager } from './SaveManager.js';
@@ -172,12 +179,20 @@ export class CharacterSystem {
   }
 
   beginBattle() {
+    const skill = this.selectedCharacter?.skill;
+    const triggerType = skill?.trigger?.type || null;
+    const triggerValue = this._getSkillTriggerValue(skill);
+
     this._battle = {
       hits: 0,
       perfects: 0,
       combo: 0,
       activeEffects: [],
-      usedSkill: false
+      // スキルは1演奏中に何度でも発動可能。
+      // combo / hits / perfect のいずれも、条件値の倍数ごとに再発動する。
+      skillTriggerType: triggerType,
+      skillTriggerValue: triggerValue,
+      nextSkillTrigger: triggerValue > 0 ? triggerValue : null
     };
   }
 
@@ -185,29 +200,98 @@ export class CharacterSystem {
     this._battle = null;
   }
 
+  _getSkillTriggerValue(skill) {
+    const raw = Number(skill?.trigger?.value);
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+
+    // コンボ条件・合計回数条件・PERFECT条件は最低20。
+    // 既存のキャラデータが10や15でも、実際のゲーム内条件は20として扱う。
+    return Math.max(20, Math.floor(raw));
+  }
+
+  _getSkillMetric(triggerType) {
+    if (!this._battle) return 0;
+
+    if (triggerType === 'combo') return this._battle.combo;
+    if (triggerType === 'hits') return this._battle.hits;
+    if (triggerType === 'perfect') return this._battle.perfects;
+
+    return 0;
+  }
+
+  _activateSkill(player, skill) {
+    if (!this._battle || !skill) return;
+
+    const effect = skill.effect;
+    if (!effect) return;
+
+    if (effect.type === 'heal') {
+      player?.heal?.(effect.value);
+    }
+
+    if (effect.type === 'attackBuff') {
+      const duration = Number(effect.durationSec) || 0;
+      this._battle.activeEffects.push({
+        type: 'attackBuff',
+        value: Number(effect.value) || 0,
+        until: performance.now() / 1000 + duration
+      });
+    }
+
+    if (effect.type === 'missDamageMult') {
+      const duration = Number(effect.durationSec) || 0;
+      this._battle.activeEffects.push({
+        type: 'missDamageMult',
+        value: Number(effect.value) || 1,
+        until: performance.now() / 1000 + duration
+      });
+    }
+
+    this.playVoice('skill');
+    bus.emit('character:skill', {
+      character: this.selectedCharacter,
+      skill
+    });
+  }
+
   onJudgement(judgement, combo, player) {
     if (!this._battle) return;
+
     this._battle.hits += 1;
-    this._battle.combo = combo;
-    if (judgement === 'PERFECT') this._battle.perfects += 1;
-    const skill = this.selectedCharacter.skill;
-    if (!skill || this._battle.usedSkill) return;
-    const trigger = skill.trigger;
-    const reached = trigger.type === 'combo'
-      ? combo >= trigger.value
-      : trigger.type === 'hits'
-        ? this._battle.hits >= trigger.value
-        : trigger.type === 'perfect'
-          ? this._battle.perfects >= trigger.value
-          : false;
-    if (!reached) return;
-    this._battle.usedSkill = true;
-    const effect = skill.effect;
-    if (effect.type === 'heal') player.heal(effect.value);
-    if (effect.type === 'attackBuff') this._battle.activeEffects.push({ type: 'attackBuff', value: effect.value, until: performance.now() / 1000 + effect.durationSec });
-    if (effect.type === 'missDamageMult') this._battle.activeEffects.push({ type: 'missDamageMult', value: effect.value, until: performance.now() / 1000 + effect.durationSec });
-    this.playVoice('skill');
-    bus.emit('character:skill', { character: this.selectedCharacter, skill });
+    this._battle.combo = Math.max(0, Number(combo) || 0);
+
+    if (judgement === 'PERFECT') {
+      this._battle.perfects += 1;
+    }
+
+    const skill = this.selectedCharacter?.skill;
+    const trigger = skill?.trigger;
+    if (!skill || !trigger) return;
+
+    const triggerValue = this._getSkillTriggerValue(skill);
+    if (!triggerValue) return;
+
+    // 演奏途中でキャラクターが切り替わったり、
+    // 古いセーブデータを読み込んだ場合でも安全に初期化する。
+    if (
+      this._battle.skillTriggerType !== trigger.type ||
+      this._battle.skillTriggerValue !== triggerValue ||
+      !Number.isFinite(this._battle.nextSkillTrigger)
+    ) {
+      this._battle.skillTriggerType = trigger.type;
+      this._battle.skillTriggerValue = triggerValue;
+      this._battle.nextSkillTrigger = triggerValue;
+    }
+
+    const metric = this._getSkillMetric(trigger.type);
+
+    // 「10回」が設定されていても最低20回。
+    // 20, 40, 60, 80... のように倍数へ到達するたび何度でも発動する。
+    // コンボならコンボが切れた後に再び20コンボへ到達しても発動する。
+    while (metric >= this._battle.nextSkillTrigger) {
+      this._activateSkill(player, skill);
+      this._battle.nextSkillTrigger += triggerValue;
+    }
   }
 
   getBattleModifiers() {
