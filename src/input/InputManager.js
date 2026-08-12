@@ -14,13 +14,13 @@ export class InputManager {
   constructor(touchTargetEl, gimmicks = []) {
     this.gimmicks = gimmicks;
     this.keyboard = new KeyboardInput(
-      (lane) => this._emitDown(lane),
-      (lane) => this._emitUp(lane)
+      (lane, eventTimeMs) => this._emitDown(lane, eventTimeMs),
+      (lane, eventTimeMs) => this._emitUp(lane, eventTimeMs)
     );
     this.touch = new TouchInput(
       touchTargetEl,
-      (lane) => this._emitDown(lane),
-      (lane) => this._emitUp(lane)
+      (lane, eventTimeMs) => this._emitDown(lane, eventTimeMs),
+      (lane, eventTimeMs) => this._emitUp(lane, eventTimeMs)
     );
   }
 
@@ -34,12 +34,26 @@ export class InputManager {
     return lane;
   }
 
-  _emitDown(rawLane) {
-    bus.emit('input:lanedown', { lane: this._transformLane(rawLane), atSec: performance.now() / 1000 });
+  _normalizeEventTimeMs(eventTimeMs) {
+    const t = Number(eventTimeMs);
+    const now = performance.now();
+    if (!Number.isFinite(t)) return now;
+    const diff = now - t;
+    return diff >= -50 && diff <= 500 ? t : now;
   }
 
-  _emitUp(rawLane) {
-    bus.emit('input:laneup', { lane: this._transformLane(rawLane), atSec: performance.now() / 1000 });
+  _emitDown(rawLane, eventTimeMs = performance.now()) {
+    bus.emit('input:lanedown', {
+      lane: this._transformLane(rawLane),
+      eventTimeMs: this._normalizeEventTimeMs(eventTimeMs)
+    });
+  }
+
+  _emitUp(rawLane, eventTimeMs = performance.now()) {
+    bus.emit('input:laneup', {
+      lane: this._transformLane(rawLane),
+      eventTimeMs: this._normalizeEventTimeMs(eventTimeMs)
+    });
   }
 
   attach() {
