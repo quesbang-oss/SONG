@@ -43,7 +43,7 @@ export class Renderer {
     window.addEventListener('resize', () => this._resize());
   }
 
-  resize() {
+  _resize() {
   const rect = this.canvas.getBoundingClientRect();
 
   // スマホではDPRを最大1.5に制限
