@@ -2,6 +2,36 @@ import { bus } from '../utils/EventBus.js';
 import { characterSystem } from './CharacterSystem.js';
 import { gameState } from './GameState.js';
 
+/*
+ * キャラクター画像の解決。
+ *
+ * CharacterHub.js は src/core/ にあるため、
+ * src/assets/ に置かれている画像は import.meta.glob() で
+ * Vite に実ファイルとして認識させる。
+ *
+ * これなら base: './' の影響で
+ * ./assets/foo.png → SONG/assets/foo.png
+ * のようにURLだけを推測して404になる問題を避けられる。
+ *
+ * public/assets/ にある場合は後半の相対URLもフォールバックとして使用する。
+ */
+const CHARACTER_IMAGE_ASSETS = import.meta.glob(
+  '../assets/**/*.{png,jpg,jpeg,webp,gif}',
+  {
+    eager: true,
+    query: '?url',
+    import: 'default'
+  }
+);
+
+const CHARACTER_IMAGE_BY_NAME = new Map(
+  Object.entries(CHARACTER_IMAGE_ASSETS).map(([path, url]) => [
+    path.split('/').pop().toLowerCase(),
+    url
+  ])
+);
+
+
 const TYPE_LABEL = {
   HP: 'HP特化',
   ATTACK: '攻撃特化',
@@ -35,9 +65,7 @@ function resolveAssetUrl(assetPath) {
     return '';
   }
 
-  /*
-   * data/blob/外部URLはそのまま使用。
-   */
+  // 外部URL / data / blob はそのまま。
   if (
     value.startsWith('data:') ||
     value.startsWith('blob:') ||
@@ -48,35 +76,33 @@ function resolveAssetUrl(assetPath) {
   }
 
   /*
-   * 重要:
-   * Vite の設定は base: './'。
-   *
-   * characters.json の画像パスも
-   *
-   *   ./assets/arukarasu.png
-   *
-   * となっているため、ここで BASE_URL を
-   * もう一度付け足さない。
-   *
-   * 「./assets/...」をそのまま img.src に渡すことで、
-   * 開発環境でも build 後でも現在のHTMLの場所を基準に
-   * 正しく解決される。
-   *
-   * 以前の修正版でここを加工したことで、
-   * SONG/ 等のパス環境によって画像URLがずれる可能性があった。
+   * ファイル名だけを取り出して src/assets の実ファイルを探す。
+   * 例:
+   * ./assets/arukarasu.png
+   * assets/arukarasu.png
+   * arukarasu.png
+   * のどれでも arukarasu.png として検索できる。
    */
-  if (
-    value.startsWith('./') ||
-    value.startsWith('../') ||
-    value.startsWith('/')
-  ) {
-    return value;
+  const fileName = value
+    .split('/')
+    .pop()
+    .toLowerCase();
+
+  const bundledUrl = CHARACTER_IMAGE_BY_NAME.get(fileName);
+
+  if (bundledUrl) {
+    return bundledUrl;
   }
 
   /*
-   * パスに ./ が付いていない場合だけ補う。
+   * src/assets に見つからない場合は public/assets を想定。
+   * Vite の base: './' なので、ここでは絶対パスに固定しない。
    */
-  return `./${value.replace(/^\.\//, '')}`;
+  const cleanFileName = value
+    .replace(/^\.?\//, '')
+    .replace(/^assets\//, '');
+
+  return `./assets/${cleanFileName}`;
 }
 
 function skillTriggerText(skill) {
@@ -740,15 +766,23 @@ export class CharacterHub {
           imageErrorCount += 1;
 
           /*
-           * 最初の失敗時は、加工なしのJSONパスを再試行。
-           * それでも失敗した場合だけプレースホルダーにする。
+           * src/assets のglob URLで失敗した場合だけ、
+           * public/assets 用の相対URLを1回試す。
            */
+          const fallbackUrl = `./assets/${
+            String(character.image)
+              .split('/')
+              .pop()
+          }`;
+
           if (
             imageErrorCount === 1 &&
-            character.image &&
-            image.src !== String(character.image)
+            image.src !== new URL(
+              fallbackUrl,
+              window.location.href
+            ).href
           ) {
-            image.src = String(character.image);
+            image.src = fallbackUrl;
             return;
           }
 
