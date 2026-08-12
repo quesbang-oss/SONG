@@ -12,6 +12,7 @@ import { ChartEditor } from '../editor/ChartEditor.js';
 import { BossManager } from '../boss/BossManager.js';
 import { StageValidator } from '../ugc/StageValidator.js';
 import { stageManager } from '../ugc/StageManager.js';
+import { StagePublisher } from '../ugc/StagePublisher.js';
 import { PlaySession } from '../core/Game.js';
 import { DIFFICULTY, NOTE_TYPES, JUDGEMENT } from '../utils/constants.js';
 
@@ -42,6 +43,7 @@ export class UI {
     bus.on('play:finished', (result) => this._onPlayFinished(result));
 
     this._render(gameState.screen, gameState.screenParams);
+    this._importSharedStageFromUrl();
 
     // ゲーム中は ESC / P でも一時停止メニューを開閉できる。
     this._handleGlobalKeyDown = (e) => {
@@ -51,6 +53,61 @@ export class UI {
       this._togglePause();
     };
     window.addEventListener('keydown', this._handleGlobalKeyDown);
+  }
+
+  async _shareStage(stage) {
+    try {
+      StagePublisher.ensureShareCode(stage);
+      stageManager.saveDraft(stage);
+      const url = StagePublisher.buildShareUrl(stage);
+      const localNotice = stage.song?.source === 'LOCAL'
+        ? ' ※LOCAL MUSICは音源ファイル自体は共有されないため、受け取った側も同じ音源ファイルを選択してください。'
+        : '';
+      const shareData = {
+        title: `ゆくコミュ ソングバトル - ${stage.name}`,
+        text: `${stage.name} を共有します${stage.shareCode ? ` (${stage.shareCode})` : ''}${localNotice}`,
+        url
+      };
+
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+
+      await navigator.clipboard.writeText(url);
+      this.toast('共有URLをコピーしました！友達に送ってください。');
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      try {
+        const url = StagePublisher.buildShareUrl(stage);
+        await navigator.clipboard.writeText(url);
+        this.toast('共有URLをコピーしました！');
+      } catch {
+        window.prompt('このURLをコピーして友達に送ってください', StagePublisher.buildShareUrl(stage));
+      }
+    }
+  }
+
+  _importSharedStageFromUrl() {
+    const raw = StagePublisher.readFromLocationHash();
+    if (!raw || !raw.name || !raw.beatmap) return;
+
+    const existing = raw.shareCode ? stageManager.findByShareCode(raw.shareCode) : null;
+    if (!existing) {
+      try {
+        stageManager.importShared(raw);
+        this.toast(`「${raw.name}」を共有ステージとして追加しました！`);
+      } catch (err) {
+        console.error('[UI] shared stage import failed', err);
+        this.toast('共有ステージの読み込みに失敗しました');
+        return;
+      }
+    } else {
+      this.toast('共有ステージはすでに保存されています');
+    }
+
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    gameState.goto('MY_STAGES');
   }
 
   toast(message) {
@@ -159,15 +216,21 @@ export class UI {
       const list = el('div', { class: 'stage-grid' });
       for (const stage of stages) {
         const card = this._stageCard(stage, () => this._confirmAndStartPlay(stage));
-        const delBtn = el('button', { class: 'btn btn-danger btn-sm', style: 'margin:8px 12px 12px;', onclick: (e) => {
-          e.stopPropagation();
-          if (confirm(`「${stage.name}」を削除しますか？`)) {
-            stageManager.deleteStage(stage.id);
-            AudioCache.delete(stage.id);
-            this._render('MY_STAGES', {});
-          }
-        } }, ['削除']);
-        card.appendChild(delBtn);
+        const actions = el('div', { style: 'display:flex;gap:8px;padding:8px 12px 12px;' }, [
+          el('button', { class: 'btn btn-secondary btn-sm', onclick: (e) => {
+            e.stopPropagation();
+            this._shareStage(stage);
+          } }, ['↗ 共有']),
+          el('button', { class: 'btn btn-danger btn-sm', onclick: (e) => {
+            e.stopPropagation();
+            if (confirm(`「${stage.name}」を削除しますか？`)) {
+              stageManager.deleteStage(stage.id);
+              AudioCache.delete(stage.id);
+              this._render('MY_STAGES', {});
+            }
+          } }, ['削除'])
+        ]);
+        card.appendChild(actions);
         list.appendChild(card);
       }
       content.appendChild(list);
