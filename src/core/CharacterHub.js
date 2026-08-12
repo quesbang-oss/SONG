@@ -35,7 +35,9 @@ function resolveAssetUrl(assetPath) {
     return '';
   }
 
-  // data URL / blob URL / 完全なURLはそのまま使用
+  /*
+   * data/blob/外部URLはそのまま使用。
+   */
   if (
     value.startsWith('data:') ||
     value.startsWith('blob:') ||
@@ -46,37 +48,35 @@ function resolveAssetUrl(assetPath) {
   }
 
   /*
-   * Viteのimport.meta.env.BASE_URLを使用する。
+   * 重要:
+   * Vite の設定は base: './'。
    *
-   * base: './' の場合、
-   * BASE_URL は "./"。
+   * characters.json の画像パスも
    *
-   * JSONに "./assets/xxx.png" が入っている場合、
-   * そのまま "./assets/xxx.png" として解決する。
+   *   ./assets/arukarasu.png
+   *
+   * となっているため、ここで BASE_URL を
+   * もう一度付け足さない。
+   *
+   * 「./assets/...」をそのまま img.src に渡すことで、
+   * 開発環境でも build 後でも現在のHTMLの場所を基準に
+   * 正しく解決される。
+   *
+   * 以前の修正版でここを加工したことで、
+   * SONG/ 等のパス環境によって画像URLがずれる可能性があった。
    */
-  const base =
-    typeof import.meta !== 'undefined' &&
-    import.meta.env &&
-    import.meta.env.BASE_URL
-      ? import.meta.env.BASE_URL
-      : './';
-
-  let cleanPath = value.replace(/^\.?\//, '');
-
-  let cleanBase = String(base);
-
-  if (!cleanBase.endsWith('/')) {
-    cleanBase += '/';
+  if (
+    value.startsWith('./') ||
+    value.startsWith('../') ||
+    value.startsWith('/')
+  ) {
+    return value;
   }
 
   /*
-   * baseが "./" の場合:
-   *   ./ + assets/xxx.png
-   *
-   * baseが "/GAME/" 等の場合:
-   *   /GAME/ + assets/xxx.png
+   * パスに ./ が付いていない場合だけ補う。
    */
-  return `${cleanBase}${cleanPath}`;
+  return `./${value.replace(/^\.\//, '')}`;
 }
 
 function skillTriggerText(skill) {
@@ -726,7 +726,7 @@ export class CharacterHub {
         image.alt =
           character.name;
 
-        image.loading = 'lazy';
+        image.loading = 'eager';
         image.draggable = false;
 
         /*
@@ -734,7 +734,24 @@ export class CharacterHub {
          * 404画像をそのまま表示せず、
          * プレースホルダーへ切り替える。
          */
+        let imageErrorCount = 0;
+
         image.onerror = () => {
+          imageErrorCount += 1;
+
+          /*
+           * 最初の失敗時は、加工なしのJSONパスを再試行。
+           * それでも失敗した場合だけプレースホルダーにする。
+           */
+          if (
+            imageErrorCount === 1 &&
+            character.image &&
+            image.src !== String(character.image)
+          ) {
+            image.src = String(character.image);
+            return;
+          }
+
           image.replaceWith(
             this._createImageFallback(
               character.name
