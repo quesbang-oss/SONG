@@ -14,21 +14,13 @@ import { LANE_COUNT } from '../utils/constants.js';
  * - スワイプによるブラウザ操作の防止
  */
 export class TouchInput {
-  /**
-   * @param {HTMLElement} targetEl
-   * @param {(lane: number) => void} onLaneDown
-   * @param {(lane: number) => void} onLaneUp
-   */
   constructor(targetEl, onLaneDown, onLaneUp) {
     this.targetEl = targetEl;
     this.onLaneDown = onLaneDown;
     this.onLaneUp = onLaneUp;
 
-    /**
-     * touch.identifier -> lane
-     * @type {Map<number, number>}
-     */
-    this._activeTouches = new Map();
+    this._activeTouches =
+      new Map();
 
     this._handleTouchStart =
       this._handleTouchStart.bind(this);
@@ -68,8 +60,8 @@ export class TouchInput {
       { passive: false }
     );
 
-    // ブラウザのジェスチャーを防止
-    this.targetEl.style.touchAction = 'none';
+    this.targetEl.style.touchAction =
+      'none';
   }
 
   detach() {
@@ -96,29 +88,32 @@ export class TouchInput {
     this._activeTouches.clear();
   }
 
-  /**
-   * ブラウザ差異を吸収して、performance.now() と同じ時間軸の
-   * イベント時刻を返す。異なる時間軸なら現在時刻へフォールバック。
-   */
   _eventTimeMs(event) {
-    const t = Number(event?.timeStamp);
-    const now = performance.now();
-    if (!Number.isFinite(t)) return now;
-    const diff = now - t;
-    // 同一timeOriginなら0〜500ms程度の遅延になる。
-    if (diff >= -50 && diff <= 500) return t;
+    const t =
+      Number(event?.timeStamp);
+
+    const now =
+      performance.now();
+
+    if (
+      !Number.isFinite(t)
+    ) {
+      return now;
+    }
+
+    const diff =
+      now - t;
+
+    if (
+      diff >= -50 &&
+      diff <= 500
+    ) {
+      return t;
+    }
+
     return now;
   }
 
-  /**
-   * タップ位置からレーン番号を取得。
-   *
-   * 画面全体を横方向に LANE_COUNT 分割する。
-   *
-   * 例: 4レーン
-   *
-   * | 0 | 1 | 2 | 3 |
-   */
   _laneFromX(clientX) {
     const rect =
       this.targetEl.getBoundingClientRect();
@@ -128,28 +123,42 @@ export class TouchInput {
     }
 
     const relativeX =
-      (clientX - rect.left) / rect.width;
+      (clientX - rect.left) /
+      rect.width;
 
     const clampedX =
-      Math.max(0, Math.min(0.999999, relativeX));
+      Math.max(
+        0,
+        Math.min(
+          0.999999,
+          relativeX
+        )
+      );
 
     return Math.floor(
       clampedX * LANE_COUNT
     );
   }
 
-  /**
-   * タッチ開始
-   */
   _handleTouchStart(event) {
     event.preventDefault();
 
-    for (const touch of event.changedTouches) {
-      const lane =
-        this._laneFromX(touch.clientX);
+    const eventTimeMs =
+      this._eventTimeMs(event);
 
-      // 同じタッチIDがすでに存在する場合は無視
-      if (this._activeTouches.has(touch.identifier)) {
+    for (
+      const touch of event.changedTouches
+    ) {
+      const lane =
+        this._laneFromX(
+          touch.clientX
+        );
+
+      if (
+        this._activeTouches.has(
+          touch.identifier
+        )
+      ) {
         continue;
       }
 
@@ -158,59 +167,69 @@ export class TouchInput {
         lane
       );
 
-      // ノーツ判定開始
-      this.onLaneDown(lane, this._eventTimeMs(event));
+      this.onLaneDown(
+        lane,
+        eventTimeMs
+      );
     }
   }
 
-  /**
-   * タッチ中
-   *
-   * 長押しノーツでは指を動かしても
-   * 「離した」と判定しない。
-   *
-   * そのため laneUp はここでは呼ばない。
-   */
   _handleTouchMove(event) {
     event.preventDefault();
   }
 
-  /**
-   * タッチ終了
-   */
   _handleTouchEnd(event) {
     event.preventDefault();
 
-    for (const touch of event.changedTouches) {
-      this._releaseTouch(touch.identifier);
+    const eventTimeMs =
+      this._eventTimeMs(event);
+
+    for (
+      const touch of event.changedTouches
+    ) {
+      this._releaseTouch(
+        touch.identifier,
+        eventTimeMs
+      );
     }
   }
 
-  /**
-   * タッチキャンセル
-   */
   _handleTouchCancel(event) {
     event.preventDefault();
 
-    for (const touch of event.changedTouches) {
-      this._releaseTouch(touch.identifier);
+    const eventTimeMs =
+      this._eventTimeMs(event);
+
+    for (
+      const touch of event.changedTouches
+    ) {
+      this._releaseTouch(
+        touch.identifier,
+        eventTimeMs
+      );
     }
   }
 
-  /**
-   * 指を離したときの共通処理
-   */
-  _releaseTouch(identifier) {
+  _releaseTouch(
+    identifier,
+    eventTimeMs
+  ) {
     const lane =
-      this._activeTouches.get(identifier);
+      this._activeTouches.get(
+        identifier
+      );
 
     if (lane === undefined) {
       return;
     }
 
-    this._activeTouches.delete(identifier);
+    this._activeTouches.delete(
+      identifier
+    );
 
-    // 長押し終了 / 通常ノーツ終了
-    this.onLaneUp(lane, this._eventTimeMs(event));
+    this.onLaneUp(
+      lane,
+      eventTimeMs
+    );
   }
 }
