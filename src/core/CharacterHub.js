@@ -24,6 +24,30 @@ const TRIGGER_LABEL = {
  * Viteの公開ルートを基準にして解決するため、
  * 開発環境・build後の相対配置の両方で使用できる。
  */
+/*
+ * キャラクター画像の解決。
+ *
+ * このプロジェクトでは画像を src/assets/ に置いたままにする。
+ * characters.json の image が
+ *
+ *   ./src/assets/arukarasu.png
+ *   ./assets/arukarasu.png
+ *   src/assets/arukarasu.png
+ *
+ * のどれでも動くように、ファイル名だけを取り出して
+ * Vite の import.meta.glob で実際のURLへ変換する。
+ *
+ * これにより public/ へ画像を移動する必要はない。
+ */
+const CHARACTER_ASSETS = import.meta.glob(
+  '../assets/*',
+  {
+    eager: true,
+    query: '?url',
+    import: 'default'
+  }
+);
+
 function resolveAssetUrl(assetPath) {
   if (!assetPath) {
     return '';
@@ -35,7 +59,7 @@ function resolveAssetUrl(assetPath) {
     return '';
   }
 
-  // data URL / blob URL / 完全なURLはそのまま使用
+  // data/blob/外部URLはそのまま使用する。
   if (
     value.startsWith('data:') ||
     value.startsWith('blob:') ||
@@ -46,37 +70,76 @@ function resolveAssetUrl(assetPath) {
   }
 
   /*
-   * Viteのimport.meta.env.BASE_URLを使用する。
+   * JSON側に入っているパスからファイル名だけを取得する。
    *
-   * base: './' の場合、
-   * BASE_URL は "./"。
-   *
-   * JSONに "./assets/xxx.png" が入っている場合、
-   * そのまま "./assets/xxx.png" として解決する。
+   * 例:
+   * ./src/assets/arukarasu.png
+   *              ↓
+   * arukarasu.png
    */
-  const base =
-    typeof import.meta !== 'undefined' &&
-    import.meta.env &&
-    import.meta.env.BASE_URL
-      ? import.meta.env.BASE_URL
-      : './';
+  const normalized = value
+    .replace(/\\/g, '/')
+    .split('?')[0]
+    .split('#')[0];
 
-  let cleanPath = value.replace(/^\.?\//, '');
+  const fileName =
+    normalized.split('/').pop();
 
-  let cleanBase = String(base);
-
-  if (!cleanBase.endsWith('/')) {
-    cleanBase += '/';
+  if (!fileName) {
+    return '';
   }
 
   /*
-   * baseが "./" の場合:
-   *   ./ + assets/xxx.png
+   * import.meta.glob のキーは
+   * CharacterHub.js が src/core/ にあるため
    *
-   * baseが "/GAME/" 等の場合:
-   *   /GAME/ + assets/xxx.png
+   * ../assets/arukarasu.png
+   *
+   * になる。
    */
-  return `${cleanBase}${cleanPath}`;
+  const key =
+    `../assets/${fileName}`;
+
+  const resolved =
+    CHARACTER_ASSETS[key];
+
+  if (typeof resolved === 'string') {
+    return resolved;
+  }
+
+  /*
+   * 念のため大文字・小文字やパス表記の違いを
+   * 吸収するフォールバック。
+   */
+  const lowerFileName =
+    fileName.toLowerCase();
+
+  for (const [assetKey, assetUrl] of Object.entries(
+    CHARACTER_ASSETS
+  )) {
+    const candidate =
+      assetKey
+        .split('/')
+        .pop()
+        ?.toLowerCase();
+
+    if (
+      candidate === lowerFileName &&
+      typeof assetUrl === 'string'
+    ) {
+      return assetUrl;
+    }
+  }
+
+  /*
+   * globに存在しない場合の最終フォールバック。
+   * ここでは src/assets を公開URLとして直接参照しない。
+   */
+  console.warn(
+    `[CharacterHub] キャラクター画像が見つかりません: ${value}`
+  );
+
+  return '';
 }
 
 function skillTriggerText(skill) {
