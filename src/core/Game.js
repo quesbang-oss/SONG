@@ -128,9 +128,9 @@ export class PlaySession {
   }
 
   // ---------- 入力処理 ----------
-  _onLaneDown({ lane }) {
+  _onLaneDown({ lane, eventTimeMs }) {
     if (this._paused || !this._running) return;
-    const now = rhythmClock.inputNow();
+    const now = this._inputTime(eventTimeMs);
     const windowMult = this.effectiveAbilities.judgeWindowMult;
 
     // このレーンで判定窓内の最も近いノーツを探す
@@ -159,10 +159,10 @@ export class PlaySession {
     }
   }
 
-  _onLaneUp({ lane }) {
+  _onLaneUp({ lane, eventTimeMs }) {
     const note = this._activeHolds.get(lane);
     if (!note) return;
-    const now = rhythmClock.inputNow();
+    const now = this._inputTime(eventTimeMs);
     this._activeHolds.delete(lane);
     if (now < note.endTime - 0.12) {
       // 早期リリース：HOLD失敗。ノーツを消化済みにして画面から除去する。
@@ -176,6 +176,19 @@ export class PlaySession {
       note.holdActive = false;
       note.hit = true;
     }
+  }
+
+  /**
+   * タッチ/キーイベントがメインスレッド待ちで遅れて処理された場合、
+   * イベント発生時刻を使ってその遅延分を補正する。これによりスマホの
+   * 一時的な描画負荷で「押したのにMISS」になる現象を軽減する。
+   */
+  _inputTime(eventTimeMs) {
+    const current = performance.now();
+    const eventMs = Number(eventTimeMs);
+    if (!Number.isFinite(eventMs)) return rhythmClock.inputNow();
+    const latencySec = Math.max(0, Math.min(0.12, (current - eventMs) / 1000));
+    return rhythmClock.inputNow() - latencySec;
   }
 
   // ---------- 判定・ダメージ適用 ----------
