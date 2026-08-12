@@ -1068,13 +1068,17 @@ export class CharacterHub {
       node.className =
         'ch-mission';
 
+      const safeProgress = Number.isFinite(Number(progress))
+        ? Math.max(0, Number(progress))
+        : 0;
       const safeMax =
-        Math.max(1, max);
+        Math.max(1, Number(max) || 1);
+      const safeClaimed = Boolean(claimed);
 
       const percentage =
         Math.min(
           100,
-          (progress / safeMax) * 100
+          (safeProgress / safeMax) * 100
         );
 
       node.innerHTML = `
@@ -1088,20 +1092,20 @@ export class CharacterHub {
 
         <div class="ch-row">
           <span>
-            ${progress} / ${max}
+            ${safeProgress} / ${safeMax}
           </span>
 
           <button
             class="mission-claim-button"
             ${
-              claimed ||
-              progress < max
+              safeClaimed ||
+              safeProgress < safeMax
                 ? 'disabled'
                 : ''
             }
           >
             ${
-              claimed
+              safeClaimed
                 ? '受取済み'
                 : '受け取る'
             }
@@ -1129,29 +1133,57 @@ export class CharacterHub {
       body.appendChild(node);
     };
 
+    // セーブデータや旧バージョンのデータが残っていても
+    // ミッション画面自体がクラッシュしないよう、ここで完全に正規化する。
+    // CharacterSystem の現在の仕様では event は missions の外にある。
+    const missions = summary?.missions || {};
+    const daily = missions.daily || {};
+    const weekly = missions.weekly || {};
+    const event = summary?.event || missions.event || {};
+
+    const dailyProgress = Number.isFinite(Number(daily.progress))
+      ? Number(daily.progress)
+      : 0;
+    const weeklyProgress = Number.isFinite(Number(weekly.progress))
+      ? Number(weekly.progress)
+      : 0;
+    const eventProgress = Number.isFinite(Number(event.progress))
+      ? Number(event.progress)
+      : 0;
+
+    const dailyClaimed = Boolean(daily.claimed);
+    const weeklyClaimed = Boolean(weekly.claimed);
+    const eventClaimed = Boolean(event.claimed);
+
     addMission(
       'デイリー：曲を3回クリア',
-      summary.missions.daily.progress,
+      dailyProgress,
       3,
-      summary.missions.daily.claimed,
+      dailyClaimed,
       () => characterSystem.claimDaily()
     );
 
     addMission(
       'ウィークリー：曲を10回クリア',
-      summary.missions.weekly.progress,
+      weeklyProgress,
       10,
-      summary.missions.weekly.claimed,
+      weeklyClaimed,
       () => characterSystem.claimWeekly()
     );
 
     addMission(
       'イベント：曲を7回クリア',
-      summary.event.progress,
+      eventProgress,
       7,
-      summary.event.claimed,
+      eventClaimed,
       () => characterSystem.claimEvent()
     );
+
+    const loginData = summary?.login || {};
+    const loginStreak = Number.isFinite(Number(loginData.streak))
+      ? Math.max(0, Number(loginData.streak))
+      : 0;
+    const loginClaimedToday = Boolean(loginData.claimedToday);
 
     const login =
       document.createElement('div');
@@ -1164,19 +1196,19 @@ export class CharacterHub {
 
       <div class="ch-muted">
         連続ログイン
-        ${summary.login.streak}日
+        ${loginStreak}日
       </div>
 
       <button
         class="ch-bigbtn"
         ${
-          summary.login.claimedToday
+          loginClaimedToday
             ? 'disabled'
             : ''
         }
       >
         ${
-          summary.login.claimedToday
+          loginClaimedToday
             ? '本日受取済み'
             : '今日の報酬を受け取る'
         }
