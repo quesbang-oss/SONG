@@ -285,11 +285,18 @@ for (const note of notes) {
 }
 
     for (const note of notes) {
-      if (note.hit || note.missed) continue;
-      const progress = 1 - (note.time - nowSec) / approachSec;
-      if (progress < -0.08 || progress > PASS_THROUGH_LIMIT) continue;
-      this._drawNote(ctx, note, progress);
-    }
+  if (note.hit || note.missed) continue;
+
+  // 長押し中は通常の「頭」を描画しない。
+  // 残っている部分は上のHOLDトレイルだけで表示する。
+  if (note.type === NOTE_TYPES.HOLD && note.holdActive) continue;
+
+  const progress = 1 - (note.time - nowSec) / approachSec;
+
+  if (progress < -0.08 || progress > PASS_THROUGH_LIMIT) continue;
+
+  this._drawNote(ctx, note, progress);
+}
 
     // レーンヒットフラッシュ（判定ライン付近が光る）
     const bottom = this.laneGeometryAt(1);
