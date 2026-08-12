@@ -97,6 +97,20 @@ export class TouchInput {
   }
 
   /**
+   * ブラウザ差異を吸収して、performance.now() と同じ時間軸の
+   * イベント時刻を返す。異なる時間軸なら現在時刻へフォールバック。
+   */
+  _eventTimeMs(event) {
+    const t = Number(event?.timeStamp);
+    const now = performance.now();
+    if (!Number.isFinite(t)) return now;
+    const diff = now - t;
+    // 同一timeOriginなら0〜500ms程度の遅延になる。
+    if (diff >= -50 && diff <= 500) return t;
+    return now;
+  }
+
+  /**
    * タップ位置からレーン番号を取得。
    *
    * 画面全体を横方向に LANE_COUNT 分割する。
@@ -145,7 +159,7 @@ export class TouchInput {
       );
 
       // ノーツ判定開始
-      this.onLaneDown(lane);
+      this.onLaneDown(lane, this._eventTimeMs(event));
     }
   }
 
@@ -197,6 +211,6 @@ export class TouchInput {
     this._activeTouches.delete(identifier);
 
     // 長押し終了 / 通常ノーツ終了
-    this.onLaneUp(lane);
+    this.onLaneUp(lane, this._eventTimeMs(event));
   }
 }
