@@ -43,14 +43,30 @@ export class Renderer {
     window.addEventListener('resize', () => this._resize());
   }
 
-  _resize() {
-    const rect = this.canvas.getBoundingClientRect();
-    this.width = rect.width;
-    this.height = rect.height;
-    this.canvas.width = Math.max(1, Math.round(this.width * this.dpr));
-    this.canvas.height = Math.max(1, Math.round(this.height * this.dpr));
-    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-  }
+  resize() {
+  const rect = this.canvas.getBoundingClientRect();
+
+  // スマホではDPRを最大1.5に制限
+  // 3倍・4倍DPRの端末でCanvasを巨大化させない
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const maxDpr = isMobile ? 1.5 : 2;
+  const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+
+  this.canvas.width = Math.floor(rect.width * dpr);
+  this.canvas.height = Math.floor(rect.height * dpr);
+
+  this.ctx.setTransform(
+    dpr,
+    0,
+    0,
+    dpr,
+    0,
+    0
+  );
+
+  this.width = rect.width;
+  this.height = rect.height;
+}
 
   // ---------- パースペクティブ・レーン形状 ----------
 
