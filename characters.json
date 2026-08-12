@@ -1,0 +1,135 @@
+[
+  {
+    "id": "hp_001",
+    "name": "ガード・ワン",
+    "rarity": 3,
+    "type": "HP",
+    "description": "最大HPに特化したキャラクター。",
+    "baseHp": 1250,
+    "attackMultiplier": 1.0,
+    "skill": null,
+    "image": null,
+    "voice": null
+  },
+  {
+    "id": "hp_002",
+    "name": "ガード・ツー",
+    "rarity": 4,
+    "type": "HP",
+    "description": "さらに高い最大HPを持つ耐久型。",
+    "baseHp": 1500,
+    "attackMultiplier": 1.0,
+    "skill": null,
+    "image": null,
+    "voice": null
+  },
+  {
+    "id": "hp_003",
+    "name": "ガーディアン・ゼロ",
+    "rarity": 5,
+    "type": "HP",
+    "description": "最高レアのHP特化。最後まで生き残ることを重視する。",
+    "baseHp": 1800,
+    "attackMultiplier": 1.0,
+    "skill": {
+      "id": "hp_recovery",
+      "name": "不屈の鼓動",
+      "trigger": { "type": "combo", "value": 20 },
+      "effect": { "type": "heal", "value": 120 }
+    },
+    "image": null,
+    "voice": { "win": null, "lose": null, "skill": null }
+  },
+  {
+    "id": "atk_001",
+    "name": "ビート・ワン",
+    "rarity": 3,
+    "type": "ATTACK",
+    "description": "攻撃性能を優先したキャラクター。",
+    "baseHp": 850,
+    "attackMultiplier": 1.15,
+    "skill": null,
+    "image": null,
+    "voice": null
+  },
+  {
+    "id": "atk_002",
+    "name": "ビート・ツー",
+    "rarity": 4,
+    "type": "ATTACK",
+    "description": "高火力でボスを素早く削る。",
+    "baseHp": 750,
+    "attackMultiplier": 1.3,
+    "skill": null,
+    "image": null,
+    "voice": null
+  },
+  {
+    "id": "atk_003",
+    "name": "ブレイク・マスター",
+    "rarity": 5,
+    "type": "ATTACK",
+    "description": "最高レアの攻撃特化。",
+    "baseHp": 700,
+    "attackMultiplier": 1.5,
+    "skill": {
+      "id": "attack_boost",
+      "name": "ブレイクビート",
+      "trigger": { "type": "hits", "value": 10 },
+      "effect": { "type": "attackBuff", "value": 0.25, "durationSec": 8 }
+    },
+    "image": null,
+    "voice": { "win": null, "lose": null, "skill": null }
+  },
+  {
+    "id": "sp_001",
+    "name": "リズム・ワン",
+    "rarity": 3,
+    "type": "SPECIAL",
+    "description": "条件達成型スキルを使う特殊特化。",
+    "baseHp": 1000,
+    "attackMultiplier": 1.0,
+    "skill": {
+      "id": "combo_heal",
+      "name": "リズムヒール",
+      "trigger": { "type": "combo", "value": 10 },
+      "effect": { "type": "heal", "value": 70 }
+    },
+    "image": null,
+    "voice": null
+  },
+  {
+    "id": "sp_002",
+    "name": "リズム・ツー",
+    "rarity": 4,
+    "type": "SPECIAL",
+    "description": "ノーツを一定回数叩くとスキルが発動する。",
+    "baseHp": 1000,
+    "attackMultiplier": 1.0,
+    "skill": {
+      "id": "hit_guard",
+      "name": "セーフティビート",
+      "trigger": { "type": "hits", "value": 15 },
+      "effect": { "type": "missDamageMult", "value": 0.65, "durationSec": 10 }
+    },
+    "image": null,
+    "voice": null
+  },
+  {
+    "id": "sp_003",
+    "name": "リズム・エース",
+    "rarity": 5,
+    "type": "SPECIAL",
+    "description": "条件を満たしたときだけ強力なスキルを発動する最高レア。",
+    "baseHp": 1050,
+    "attackMultiplier": 1.05,
+    "skill": {
+      "id": "perfect_burst",
+      "name": "パーフェクトバースト",
+      "trigger": { "type": "perfect", "value": 10 },
+      "effect": { "type": "attackBuff", "value": 0.35, "durationSec": 10 }
+    },
+    "image": null,
+    "voice": { "win": null, "lose": null, "skill": null }
+  }
+]
