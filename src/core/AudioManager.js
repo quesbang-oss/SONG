@@ -180,6 +180,31 @@ export class AudioManager {
   }
 
   /**
+   * キーボード／タップ入力用の極小音量クリックSE。
+   * 曲・判定音を邪魔しないよう、短く低音量で再生する。
+   */
+  playInputClick() {
+    if (!this.ctx || !this.sfxGain) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(720, now);
+    osc.frequency.exponentialRampToValueAtTime(520, now + 0.022);
+
+    gain.gain.setValueAtTime(0.045, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.028);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.03);
+  }
+
+  /**
    * SAFE SONG LIBRARY用に、完全にオリジナルな楽曲をプロシージャルに生成する。
    * 外部音源を一切使用しないため、ライセンス面で常に安全。
    * @param {import('../music/SafeSongLibrary.js').SafeSongDef} def
