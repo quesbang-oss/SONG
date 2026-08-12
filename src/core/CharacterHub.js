@@ -25,13 +25,6 @@ const TRIGGER_LABEL = {
 
 /**
  * Vite の base: './' に対応したアセットURLを生成する。
- *
- * JSON側には例えば
- *   "./assets/arukarasu.png"
- * のようなパスを保存しておく。
- *
- * Viteの公開ルートを基準にして解決するため、
- * 開発環境・build後の相対配置の両方で使用できる。
  */
 function resolveAssetUrl(assetPath) {
   if (!assetPath) {
@@ -53,11 +46,6 @@ function resolveAssetUrl(assetPath) {
     return value;
   }
 
-  /*
-   * キャラクター画像は静的import済み。
-   * Viteが実ファイルを検出してbuild時に正しいURLへ変換するため、
-   * base:'./' や GitHub Pages のサブパスに依存しない。
-   */
   const fileName = value
     .split('/')
     .pop()
@@ -134,13 +122,6 @@ export class CharacterHub {
       'gacha:result',
       () => {
         this._refreshModal();
-      }
-    );
-
-    bus.on(
-      'character:skill',
-      ({ skill }) => {
-        this._showSkillNotification(skill);
       }
     );
 
@@ -303,6 +284,51 @@ export class CharacterHub {
         line-height: 1.5;
       }
 
+      /*
+       * 凸ステータス表示
+       */
+      #character-hub-root .ch-breakthrough {
+        margin-top: 8px;
+        padding: 10px;
+        border-radius: 10px;
+        background: #211d2d;
+        border: 1px solid #39314f;
+      }
+
+      #character-hub-root .ch-breakthrough-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        font-weight: 900;
+        margin-bottom: 6px;
+      }
+
+      #character-hub-root .ch-breakthrough-level {
+        color: #d8caff;
+        font-size: 15px;
+      }
+
+      #character-hub-root .ch-breakthrough-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+
+      #character-hub-root .ch-breakthrough-value {
+        font-weight: 800;
+      }
+
+      #character-hub-root .ch-breakthrough-up {
+        color: #8dffae;
+      }
+
+      #character-hub-root .ch-breakthrough-base {
+        color: #aaa6b7;
+      }
+
       #character-hub-root .ch-skill {
         margin-top: 8px;
         padding: 9px;
@@ -416,7 +442,6 @@ export class CharacterHub {
 
       /*
        * スキル発動通知
-       * ゲーム画面中央を避け、右上に表示する。
        */
       #character-hub-root .ch-skill-notice {
         position: fixed;
@@ -709,11 +734,7 @@ export class CharacterHub {
         }`;
 
       /*
-       * 未開放の場合は絶対にキャラクター画像を
-       * DOMへ入れない。
-       *
-       * これにより「未開放なのに画像だけ見える」
-       * 状態を防ぐ。
+       * キャラクター画像
        */
       if (owned && character.image) {
         const image =
@@ -728,11 +749,6 @@ export class CharacterHub {
         image.loading = 'eager';
         image.draggable = false;
 
-        /*
-         * 画像が存在しない場合も
-         * 404画像をそのまま表示せず、
-         * プレースホルダーへ切り替える。
-         */
         image.onerror = () => {
           image.replaceWith(
             this._createImageFallback(
@@ -788,36 +804,206 @@ export class CharacterHub {
           ? character.description
           : '未開放：キャラクターを開放すると詳細が表示されます';
 
+      /*
+       * 凸数
+       */
+      const breakthrough =
+        progress
+          ? Math.max(
+              0,
+              Number(progress.breakthrough) || 0
+            )
+          : 0;
+
+      /*
+       * 元の基礎ステータス
+       */
+      const baseHp =
+        Number(character.baseHp) || 0;
+
+      const baseAttack =
+        Number(character.attackMultiplier) || 0;
+
+      /*
+       * CharacterSystem.getBattleStats() と同じ
+       * 凸ボーナス計算。
+       *
+       * HP:
+       * 1凸につき +4%
+       *
+       * 攻撃:
+       * 1凸につき +2%
+       */
+      const breakthroughHpBonus =
+        baseHp * breakthrough * 0.04;
+
+      const breakthroughAttackBonus =
+        baseAttack * breakthrough * 0.02;
+
+      const totalHp =
+        Math.round(
+          baseHp * (1 + breakthrough * 0.04)
+        );
+
+      const totalAttackPercent =
+        Math.round(
+          baseAttack *
+          (1 + breakthrough * 0.02) *
+          100
+        );
+
+      const baseAttackPercent =
+        Math.round(baseAttack * 100);
+
+      const attackIncreasePercent =
+        totalAttackPercent -
+        baseAttackPercent;
+
       meta.innerHTML = `
         ${this._escape(
           TYPE_LABEL[character.type] ||
           character.type
         )}
         <br>
-        HP ${character.baseHp}
-        /
-        攻撃 ${Math.round(
-          character.attackMultiplier * 100
-        )}%
+
+        基礎HP：
+        ${baseHp}
         <br>
+
+        基礎攻撃：
+        ${baseAttackPercent}%
+        <br>
+
         ${this._escape(description)}
-        <br>
-        ${
-          progress
-            ? `Lv.${progress.level}
-               / 凸${progress.breakthrough}
-               / 所持 ${progress.owned}`
-            : '未所持'
-        }
       `;
 
       card.appendChild(meta);
 
       /*
-       * スキル情報はキャラクター画面で確認可能。
-       *
-       * 「未開放でもスキル条件だけ見える」
-       * 仕様を維持。
+       * 凸ステータスパネル
+       */
+      if (owned) {
+        const breakthroughBox =
+          document.createElement('div');
+
+        breakthroughBox.className =
+          'ch-breakthrough';
+
+        const title =
+          document.createElement('div');
+
+        title.className =
+          'ch-breakthrough-title';
+
+        const titleText =
+          document.createElement('span');
+
+        titleText.textContent =
+          breakthrough > 0
+            ? `${breakthrough}凸`
+            : '無凸';
+
+        titleText.className =
+          'ch-breakthrough-level';
+
+        const ownedCount =
+          document.createElement('span');
+
+        ownedCount.className =
+          'ch-muted';
+
+        ownedCount.textContent =
+          `所持 ${progress.owned || 1}`;
+
+        title.appendChild(titleText);
+        title.appendChild(ownedCount);
+
+        breakthroughBox.appendChild(title);
+
+        /*
+         * HP
+         */
+        const hpRow =
+          document.createElement('div');
+
+        hpRow.className =
+          'ch-breakthrough-row';
+
+        hpRow.innerHTML = `
+          <span>HP</span>
+          <span class="ch-breakthrough-value">
+            ${totalHp}
+            ${
+              breakthrough > 0
+                ? `<span class="ch-breakthrough-up">
+                    (+${Math.round(
+                      breakthroughHpBonus
+                    )})
+                  </span>`
+                : `<span class="ch-breakthrough-base">
+                    (+0)
+                  </span>`
+            }
+          </span>
+        `;
+
+        breakthroughBox.appendChild(hpRow);
+
+        /*
+         * 攻撃力
+         *
+         * attackMultiplier は倍率なので、
+         * 「何%増えたか」を表示。
+         */
+        const attackRow =
+          document.createElement('div');
+
+        attackRow.className =
+          'ch-breakthrough-row';
+
+        attackRow.innerHTML = `
+          <span>攻撃力</span>
+          <span class="ch-breakthrough-value">
+            ${totalAttackPercent}%
+            ${
+              breakthrough > 0
+                ? `<span class="ch-breakthrough-up">
+                    (+${attackIncreasePercent}%)
+                  </span>`
+                : `<span class="ch-breakthrough-base">
+                    (+0%)
+                  </span>`
+            }
+          </span>
+        `;
+
+        breakthroughBox.appendChild(attackRow);
+
+        /*
+         * 凸による補正率
+         */
+        const bonusRow =
+          document.createElement('div');
+
+        bonusRow.className =
+          'ch-breakthrough-row';
+
+        bonusRow.innerHTML = `
+          <span>凸ボーナス</span>
+          <span class="ch-breakthrough-up">
+            HP +${breakthrough * 4}%
+            /
+            攻撃 +${breakthrough * 2}%
+          </span>
+        `;
+
+        breakthroughBox.appendChild(bonusRow);
+
+        card.appendChild(breakthroughBox);
+      }
+
+      /*
+       * スキル
        */
       const skillBox =
         document.createElement('div');
@@ -862,6 +1048,9 @@ export class CharacterHub {
 
       card.appendChild(skillBox);
 
+      /*
+       * 操作
+       */
       const actions =
         document.createElement('div');
 
@@ -946,6 +1135,7 @@ export class CharacterHub {
       document.createElement('button');
 
     one.className = 'ch-bigbtn';
+
     one.textContent =
       '🎲 1回引く（100）';
 
@@ -959,6 +1149,7 @@ export class CharacterHub {
       document.createElement('button');
 
     ten.className = 'ch-bigbtn';
+
     ten.textContent =
       '🎲 10回引く（900）';
 
@@ -1128,29 +1319,20 @@ export class CharacterHub {
       body.appendChild(node);
     };
 
-    /*
-     * ミッションデータはセーブデータの世代によって
-     * 欠落している可能性がある。
-     *
-     * 現在の CharacterSystem では
-     * daily / weekly は summary.missions、
-     * event は summary.event に入っている。
-     *
-     * そのため summary.missions.event.progress を
-     * 直接読むと「Cannot read properties of undefined」
-     * になる。
-     */
-    const missions = summary.missions || {};
+    const missions =
+      summary.missions || {};
 
-    const daily = missions.daily || {
-      progress: 0,
-      claimed: false
-    };
+    const daily =
+      missions.daily || {
+        progress: 0,
+        claimed: false
+      };
 
-    const weekly = missions.weekly || {
-      progress: 0,
-      claimed: false
-    };
+    const weekly =
+      missions.weekly || {
+        progress: 0,
+        claimed: false
+      };
 
     const event =
       summary.event ||
@@ -1183,10 +1365,11 @@ export class CharacterHub {
       () => characterSystem.claimEvent()
     );
 
-    const loginData = summary.login || {
-      streak: 0,
-      claimedToday: false
-    };
+    const loginData =
+      summary.login || {
+        streak: 0,
+        claimedToday: false
+      };
 
     const login =
       document.createElement('div');
