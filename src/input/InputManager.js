@@ -1,6 +1,7 @@
 import { KeyboardInput } from './KeyboardInput.js';
 import { TouchInput } from './TouchInput.js';
 import { bus } from '../utils/EventBus.js';
+import { audioManager } from '../core/AudioManager.js';
 
 /**
  * PC(キーボード)・スマホ(タッチ)の入力を統合し、共通の
@@ -43,6 +44,10 @@ export class InputManager {
   }
 
   _emitDown(rawLane, eventTimeMs = performance.now()) {
+    // ノーツ入力そのものを変更せず、入力時だけ極小音量のクリック音を鳴らす。
+    // キーボード・タッチの両方がここを通るため、処理を二重実装しない。
+    audioManager.playInputClick();
+
     bus.emit('input:lanedown', {
       lane: this._transformLane(rawLane),
       eventTimeMs: this._normalizeEventTimeMs(eventTimeMs)
