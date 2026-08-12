@@ -30,8 +30,33 @@ html,body{
 }
 #app{position:relative;width:100vw;height:100vh;height:100dvh;overflow:hidden;}
 #game-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
-#ui-root{position:absolute;inset:0;pointer-events:none;padding-top:var(--safe-area-top);padding-bottom:var(--safe-area-bottom);}
-#ui-root > *{pointer-events:auto;}
+#ui-root{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  padding-top:var(--safe-area-top);
+  padding-bottom:var(--safe-area-bottom);
+}
+
+/* 通常UIは操作可能 */
+#ui-root > *{
+  pointer-events:auto;
+}
+
+/* ゲーム中のHUDはCanvasへのタッチを邪魔しない */
+#ui-root > .hud{
+  pointer-events:none;
+}
+
+/* HUD内で操作する一時停止ボタンだけ操作可能 */
+#ui-root > .hud .pause-btn{
+  pointer-events:auto;
+}
+
+/* レーンヒントもCanvasへのタッチを邪魔しない */
+#ui-root > .hud .lane-hint{
+  pointer-events:none;
+}
 #toast-root{position:absolute;top:calc(12px + var(--safe-area-top));left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
 .toast{
   background:var(--panel);border:1px solid var(--panel-border);border-radius:10px;
