@@ -14,6 +14,7 @@ import { saveManager } from './SaveManager.js';
 import { stageManager } from '../ugc/StageManager.js';
 import { rankingManager } from '../community/RankingManager.js';
 import { bus } from '../utils/EventBus.js';
+import { characterSystem } from './CharacterSystem.js';
 
 import {
   NOTE_TYPES,
@@ -29,17 +30,16 @@ import { clamp } from '../utils/helpers.js';
 
 /**
  * 1回のボス戦（プレイセッション）を統括するクラス。
- *
- * 音楽再生・譜面判定・ダメージ計算・フェーズ進行・
- * 描画ループなどをまとめて管理する。
+ * 音楽再生・譜面判定・ダメージ計算・フェーズ進行・描画ループの
+ * すべてをここで束ねる。
  */
 export class PlaySession {
   /**
    * @param {Object} params
-   * @param {Object} params.stage 保存済みステージデータ
+   * @param {Object} params.stage 保存済みステージデータ（StageManager形式）
    * @param {AudioBuffer} params.audioBuffer
    * @param {HTMLCanvasElement} params.canvas
-   * @param {Object} params.settings ユーザー設定
+   * @param {Object} params.settings ユーザー設定（DEFAULT_SETTINGS形式）
    * @param {number} [params.seed]
    * @param {boolean} [params.isDailyChallenge]
    */
@@ -53,75 +53,56 @@ export class PlaySession {
   }) {
     this.stage = stage;
     this.settings = settings;
-    this.seed = seed;
-    this.isDailyChallenge =
-      isDailyChallenge;
+    this.isDailyChallenge = isDailyChallenge;
 
-    this._onAudioEnded =
-      this._onAudioEnded.bind(this);
-
-    this.beatmap =
-      Beatmap.fromJSON(
-        stage.beatmap
-      );
-
+    this.beatmap = Beatmap.fromJSON(stage.beatmap);
     this.beatmap.resetRuntimeState();
 
-    this.gimmicks =
-      stage.rules?.gimmicks || [];
+    this.gimmicks = stage.rules?.gimmicks || [];
 
-    const perfectDmg =
-      JUDGE_DAMAGE.PERFECT;
+    const perfectDmg = JUDGE_DAMAGE.PERFECT;
 
-    this.boss =
-      new SongBoss({
-        name:
-          stage.boss?.name ||
-          'UNKNOWN SONG',
+    this.boss = new SongBoss({
+      name: stage.boss?.name || 'UNKNOWN SONG',
+      imageDataUrl: stage.boss?.imageDataUrl || null,
+      maxHp: SongBoss.computeMaxHp(
+        this.beatmap,
+        perfectDmg
+      )
+    });
 
-        imageDataUrl:
-          stage.boss?.imageDataUrl ||
-          null,
+    const characterStats =
+      characterSystem.getBattleStats();
 
-        maxHp:
-          SongBoss.computeMaxHp(
-            this.beatmap,
-            perfectDmg
-          )
-      });
+    this.characterStats =
+      characterStats;
 
-    this.player =
-      new Player({
-        maxHp: 1000
-      });
+    this.player = new Player({
+      maxHp: characterStats.maxHp
+    });
 
-    this.phaseSystem =
-      new PhaseSystem(
-        this.beatmap.phaseMarkers
-      );
+    this.phaseSystem = new PhaseSystem(
+      this.beatmap.phaseMarkers
+    );
 
-    this.renderer =
-      new Renderer(canvas);
+    this.renderer = new Renderer(canvas);
 
-    this.bossRenderer =
-      new BossRenderer();
+    this.bossRenderer = new BossRenderer();
 
     this.bossRenderer.setImage(
       this.boss.imageDataUrl
     );
 
-    this.effects =
-      new Effects();
+    this.effects = new Effects();
 
     this.effects.configure(
       settings
     );
 
-    this.inputManager =
-      new InputManager(
-        canvas,
-        this.gimmicks
-      );
+    this.inputManager = new InputManager(
+      canvas,
+      this.gimmicks
+    );
 
     this._laneFlashUntil = [
       0,
@@ -135,12 +116,10 @@ export class PlaySession {
 
     this._raf = null;
     this._lastFrameAt = 0;
-
     this._running = false;
     this._paused = false;
     this._ended = false;
 
-    // BPMに応じてノーツの流れる速さを調整
     const bpm =
       this.beatmap.bpm ||
       REFERENCE_BPM;
@@ -168,6 +147,8 @@ export class PlaySession {
     this._loop =
       this._loop.bind(this);
 
+    characterSystem.beginBattle();
+
     audioManager.setBuffer(
       audioBuffer
     );
@@ -193,9 +174,17 @@ export class PlaySession {
   }
 
   get effectiveAbilities() {
+    const characterModifiers =
+      characterSystem.getBattleModifiers();
+
     return {
-      attackMult: 1,
-      missDamageMult: 1,
+      attackMult:
+        characterModifiers.attackMult *
+        this.characterStats.attackMultiplier,
+
+      missDamageMult:
+        characterModifiers.missDamageMult,
+
       judgeWindowMult: 1,
       maxHpMult: 1,
       comboThresholdMult: 1,
@@ -204,10 +193,6 @@ export class PlaySession {
       lowHpAttackBonus: 0
     };
   }
-
-  // =========================================================
-  // 開始
-  // =========================================================
 
   async start() {
     bus.on(
@@ -220,15 +205,9 @@ export class PlaySession {
       this._onLaneUp
     );
 
-    bus.on(
-      'audio:ended',
-      this._onAudioEnded
-    );
-
     this.inputManager.attach();
 
     this._running = true;
-    this._paused = false;
     this._ended = false;
 
     await audioManager.play(0);
@@ -242,47 +221,8 @@ export class PlaySession {
       );
   }
 
-  // =========================================================
-  // 曲終了
-  // =========================================================
-
-  /**
-   * AudioManagerから実際の音声終了通知を受け取る。
-   *
-   * 「beatmap.duration」ではなく、
-   * 実際の音声が最後まで再生されたことを
-   * クリア判定の基準にする。
-   */
-  _onAudioEnded() {
-    if (
-      !this._running ||
-      this._ended
-    ) {
-      return;
-    }
-
-    this._ended = true;
-
-    /*
-     * 曲が最後まで再生された時点で
-     * プレイヤーが生存していればCLEAR。
-     *
-     * ボスHPはクリア条件にしない。
-     */
-    this._finish(
-      this.player.isAlive
-    );
-  }
-
-  // =========================================================
-  // 一時停止
-  // =========================================================
-
   pause() {
-    if (
-      this._paused ||
-      !this._running
-    ) {
+    if (this._paused) {
       return;
     }
 
@@ -291,15 +231,8 @@ export class PlaySession {
     audioManager.pause();
   }
 
-  // =========================================================
-  // 再開
-  // =========================================================
-
   async resume() {
-    if (
-      !this._paused ||
-      !this._running
-    ) {
+    if (!this._paused) {
       return;
     }
 
@@ -311,10 +244,6 @@ export class PlaySession {
       performance.now();
   }
 
-  // =========================================================
-  // 停止
-  // =========================================================
-
   stop() {
     this._running = false;
 
@@ -322,13 +251,13 @@ export class PlaySession {
       cancelAnimationFrame(
         this._raf
       );
-
-      this._raf = null;
     }
 
     audioManager.stop();
 
     this.inputManager.detach();
+
+    characterSystem.endBattle();
 
     bus.off(
       'input:lanedown',
@@ -339,16 +268,9 @@ export class PlaySession {
       'input:laneup',
       this._onLaneUp
     );
-
-    bus.off(
-      'audio:ended',
-      this._onAudioEnded
-    );
   }
 
-  // =========================================================
-  // 入力処理
-  // =========================================================
+  // ---------- 入力処理 ----------
 
   _onLaneDown({
     lane,
@@ -356,8 +278,7 @@ export class PlaySession {
   }) {
     if (
       this._paused ||
-      !this._running ||
-      this._ended
+      !this._running
     ) {
       return;
     }
@@ -371,8 +292,6 @@ export class PlaySession {
       this.effectiveAbilities
         .judgeWindowMult;
 
-    // このレーンで判定窓内の
-    // 最も近いノーツを探す
     let best = null;
     let bestDelta = Infinity;
 
@@ -517,14 +436,6 @@ export class PlaySession {
     }
   }
 
-  // =========================================================
-  // 入力時刻
-  // =========================================================
-
-  /**
-   * タッチ/キーイベントがメインスレッド待ちで
-   * 遅れて処理された場合の入力遅延補正。
-   */
   _inputTime(eventTimeMs) {
     const current =
       performance.now();
@@ -556,9 +467,7 @@ export class PlaySession {
     );
   }
 
-  // =========================================================
-  // 判定
-  // =========================================================
+  // ---------- 判定・ダメージ適用 ----------
 
   _applyJudgement(
     note,
@@ -579,10 +488,6 @@ export class PlaySession {
       now
     );
   }
-
-  // =========================================================
-  // スコア・ダメージ
-  // =========================================================
 
   _grantScore(
     note,
@@ -618,6 +523,12 @@ export class PlaySession {
       scoreGain
     );
 
+    characterSystem.onJudgement(
+      judgement,
+      this.player.combo,
+      this.player
+    );
+
     const laneX =
       this.renderer.laneCenterX(
         note.lane
@@ -630,10 +541,6 @@ export class PlaySession {
       note.lane
     ] =
       now + 0.1;
-
-    // -------------------------
-    // MISS
-    // -------------------------
 
     if (
       judgement ===
@@ -672,10 +579,6 @@ export class PlaySession {
 
       return;
     }
-
-    // -------------------------
-    // ヒット
-    // -------------------------
 
     const dmg =
       DamageSystem.computeBossDamage(
@@ -744,15 +647,10 @@ export class PlaySession {
     );
   }
 
-  // =========================================================
-  // メインループ
-  // =========================================================
+  // ---------- メインループ ----------
 
   _loop(tMs) {
-    if (
-      !this._running ||
-      this._ended
-    ) {
+    if (!this._running) {
       return;
     }
 
@@ -820,18 +718,6 @@ export class PlaySession {
       now
     );
 
-    /*
-     * ここでは曲終了判定をしない。
-     *
-     * 実際のAudioBufferSourceNodeの
-     * onended → audio:ended
-     * で終了させる。
-     *
-     * また、ボスを倒してもここでは
-     * ゲームを終了させない。
-     */
-
-    // プレイヤー死亡だけは即GAME OVER
     if (
       !this.player.isAlive &&
       !this._ended
@@ -845,10 +731,6 @@ export class PlaySession {
       return;
     }
   }
-
-  // =========================================================
-  // MISS処理
-  // =========================================================
 
   _autoMissExpiredNotes(
     now
@@ -893,10 +775,6 @@ export class PlaySession {
     }
   }
 
-  // =========================================================
-  // 長押し処理
-  // =========================================================
-
   _updateHolds(
     now
   ) {
@@ -936,10 +814,6 @@ export class PlaySession {
       }
     }
   }
-
-  // =========================================================
-  // 描画
-  // =========================================================
 
   _render(
     now
@@ -1009,10 +883,6 @@ export class PlaySession {
     r.ctx.restore();
   }
 
-  // =========================================================
-  // HUD
-  // =========================================================
-
   _emitHud(
     now
   ) {
@@ -1056,20 +926,9 @@ export class PlaySession {
     );
   }
 
-  // =========================================================
-  // 終了
-  // =========================================================
-
   _finish(
     cleared
   ) {
-    /*
-     * 二重終了防止
-     */
-    if (!this._ended) {
-      this._ended = true;
-    }
-
     this.stop();
 
     const grade =
