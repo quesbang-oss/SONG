@@ -1,67 +1,202 @@
 import { LANE_COUNT } from '../utils/constants.js';
 
 /**
- * スマホのタッチ入力を、画面をLANE_COUNT分割したレーンへ変換する（仕様書#47）。
- * マルチタッチ（同時押し=CHAINノーツ対応）にも対応する。
+ * スマホのタッチ入力を4レーンへ変換する。
+ *
+ * 画面を横方向に LANE_COUNT 分割し、
+ * タップした位置からレーンを判定する。
+ *
+ * 対応:
+ * - 通常タップ
+ * - 長押し
+ * - マルチタッチ
+ * - タッチキャンセル
+ * - スワイプによるブラウザ操作の防止
  */
 export class TouchInput {
   /**
    * @param {HTMLElement} targetEl
-   * @param {(lane:number)=>void} onLaneDown
-   * @param {(lane:number)=>void} onLaneUp
+   * @param {(lane: number) => void} onLaneDown
+   * @param {(lane: number) => void} onLaneUp
    */
   constructor(targetEl, onLaneDown, onLaneUp) {
     this.targetEl = targetEl;
     this.onLaneDown = onLaneDown;
     this.onLaneUp = onLaneUp;
-    /** @type {Map<number, number>} touchId -> lane */
+
+    /**
+     * touch.identifier -> lane
+     * @type {Map<number, number>}
+     */
     this._activeTouches = new Map();
-    this._handleTouchStart = this._handleTouchStart.bind(this);
-    this._handleTouchEnd = this._handleTouchEnd.bind(this);
-    this._handleTouchMove = this._handleTouchMove.bind(this);
+
+    this._handleTouchStart =
+      this._handleTouchStart.bind(this);
+
+    this._handleTouchEnd =
+      this._handleTouchEnd.bind(this);
+
+    this._handleTouchMove =
+      this._handleTouchMove.bind(this);
+
+    this._handleTouchCancel =
+      this._handleTouchCancel.bind(this);
   }
 
   attach() {
-    this.targetEl.addEventListener('touchstart', this._handleTouchStart, { passive: false });
-    this.targetEl.addEventListener('touchend', this._handleTouchEnd, { passive: false });
-    this.targetEl.addEventListener('touchmove', this._handleTouchMove, { passive: false });
-    this.targetEl.addEventListener('touchcancel', this._handleTouchEnd, { passive: false });
+    this.targetEl.addEventListener(
+      'touchstart',
+      this._handleTouchStart,
+      { passive: false }
+    );
+
+    this.targetEl.addEventListener(
+      'touchend',
+      this._handleTouchEnd,
+      { passive: false }
+    );
+
+    this.targetEl.addEventListener(
+      'touchmove',
+      this._handleTouchMove,
+      { passive: false }
+    );
+
+    this.targetEl.addEventListener(
+      'touchcancel',
+      this._handleTouchCancel,
+      { passive: false }
+    );
+
+    // ブラウザのジェスチャーを防止
+    this.targetEl.style.touchAction = 'none';
   }
 
   detach() {
-    this.targetEl.removeEventListener('touchstart', this._handleTouchStart);
-    this.targetEl.removeEventListener('touchend', this._handleTouchEnd);
-    this.targetEl.removeEventListener('touchmove', this._handleTouchMove);
-    this.targetEl.removeEventListener('touchcancel', this._handleTouchEnd);
+    this.targetEl.removeEventListener(
+      'touchstart',
+      this._handleTouchStart
+    );
+
+    this.targetEl.removeEventListener(
+      'touchend',
+      this._handleTouchEnd
+    );
+
+    this.targetEl.removeEventListener(
+      'touchmove',
+      this._handleTouchMove
+    );
+
+    this.targetEl.removeEventListener(
+      'touchcancel',
+      this._handleTouchCancel
+    );
+
     this._activeTouches.clear();
   }
 
+  /**
+   * タップ位置からレーン番号を取得。
+   *
+   * 画面全体を横方向に LANE_COUNT 分割する。
+   *
+   * 例: 4レーン
+   *
+   * | 0 | 1 | 2 | 3 |
+   */
   _laneFromX(clientX) {
-    const rect = this.targetEl.getBoundingClientRect();
-    const relX = (clientX - rect.left) / rect.width;
-    return Math.max(0, Math.min(LANE_COUNT - 1, Math.floor(relX * LANE_COUNT)));
+    const rect =
+      this.targetEl.getBoundingClientRect();
+
+    if (rect.width <= 0) {
+      return 0;
+    }
+
+    const relativeX =
+      (clientX - rect.left) / rect.width;
+
+    const clampedX =
+      Math.max(0, Math.min(0.999999, relativeX));
+
+    return Math.floor(
+      clampedX * LANE_COUNT
+    );
   }
 
-  _handleTouchStart(e) {
-    e.preventDefault();
-    for (const touch of Array.from(e.changedTouches)) {
-      const lane = this._laneFromX(touch.clientX);
-      this._activeTouches.set(touch.identifier, lane);
+  /**
+   * タッチ開始
+   */
+  _handleTouchStart(event) {
+    event.preventDefault();
+
+    for (const touch of event.changedTouches) {
+      const lane =
+        this._laneFromX(touch.clientX);
+
+      // 同じタッチIDがすでに存在する場合は無視
+      if (this._activeTouches.has(touch.identifier)) {
+        continue;
+      }
+
+      this._activeTouches.set(
+        touch.identifier,
+        lane
+      );
+
+      // ノーツ判定開始
       this.onLaneDown(lane);
     }
   }
 
-  _handleTouchMove(e) {
-    // スワイプで画面がスクロールしたり、ブラウザのジェスチャーが発生したりしないようにする。
-    e.preventDefault();
+  /**
+   * タッチ中
+   *
+   * 長押しノーツでは指を動かしても
+   * 「離した」と判定しない。
+   *
+   * そのため laneUp はここでは呼ばない。
+   */
+  _handleTouchMove(event) {
+    event.preventDefault();
   }
 
-  _handleTouchEnd(e) {
-    e.preventDefault();
-    for (const touch of Array.from(e.changedTouches)) {
-      const lane = this._activeTouches.get(touch.identifier);
-      this._activeTouches.delete(touch.identifier);
-      if (lane !== undefined) this.onLaneUp(lane);
+  /**
+   * タッチ終了
+   */
+  _handleTouchEnd(event) {
+    event.preventDefault();
+
+    for (const touch of event.changedTouches) {
+      this._releaseTouch(touch.identifier);
     }
+  }
+
+  /**
+   * タッチキャンセル
+   */
+  _handleTouchCancel(event) {
+    event.preventDefault();
+
+    for (const touch of event.changedTouches) {
+      this._releaseTouch(touch.identifier);
+    }
+  }
+
+  /**
+   * 指を離したときの共通処理
+   */
+  _releaseTouch(identifier) {
+    const lane =
+      this._activeTouches.get(identifier);
+
+    if (lane === undefined) {
+      return;
+    }
+
+    this._activeTouches.delete(identifier);
+
+    // 長押し終了 / 通常ノーツ終了
+    this.onLaneUp(lane);
   }
 }
