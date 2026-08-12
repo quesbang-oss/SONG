@@ -3,6 +3,7 @@
  * ゲーム内の唯一の時間基準は AudioContext.currentTime とし、
  * requestAnimationFrameのフレーム数には依存しない（仕様書 #49）。
  */
+import { bus } from '../utils/EventBus.js';
 export class AudioManager {
   constructor() {
     /** @type {AudioContext|null} */
@@ -105,10 +106,17 @@ export class AudioManager {
     this._startOffsetSec = clamped;
     this._isPlaying = true;
     src.onended = () => {
-      if (this._sourceNode === src) {
-        this._isPlaying = false;
-      }
-    };
+  if (this._sourceNode !== src) {
+    return;
+  }
+
+  this._isPlaying = false;
+  this._sourceNode = null;
+
+  bus.emit('audio:ended', {
+    duration: this.currentBuffer?.duration ?? 0
+  });
+};
   }
 
   pause() {
