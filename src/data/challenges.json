@@ -1,0 +1,9 @@
+{
+  "ruleVariants": [
+    { "id": "STANDARD", "label": "STANDARD", "gimmicks": [] },
+    { "id": "SPEED_UP", "label": "SPEED UP", "gimmicks": ["SPEED_2X"] },
+    { "id": "MIRROR_MATCH", "label": "MIRROR MATCH", "gimmicks": ["MIRROR"] },
+    { "id": "IRON_WILL", "label": "IRON WILL (ONE MISS)", "gimmicks": ["ONE_MISS"] },
+    { "id": "DOUBLE_OR_NOTHING", "label": "DOUBLE OR NOTHING", "gimmicks": ["DOUBLE_DAMAGE", "NO_HEAL"] }
+  ]
+}

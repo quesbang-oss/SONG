@@ -1,0 +1,58 @@
+[
+  {
+    "id": "OVERDRIVE",
+    "name": "OVERDRIVE",
+    "icon": "🔥",
+    "desc": "攻撃力+40% / MISSダメージ+30%",
+    "effects": { "attackMult": 1.4, "missDamageMult": 1.3 }
+  },
+  {
+    "id": "PRECISION",
+    "name": "PRECISION",
+    "icon": "🎯",
+    "desc": "判定範囲+15% / 攻撃力-10%",
+    "effects": { "judgeWindowMult": 1.15, "attackMult": 0.9 }
+  },
+  {
+    "id": "GLASS_CANNON",
+    "name": "GLASS CANNON",
+    "icon": "💎",
+    "desc": "攻撃力×2 / 最大HP-50%",
+    "effects": { "attackMult": 2.0, "maxHpMult": 0.5 }
+  },
+  {
+    "id": "COMBO_MASTER",
+    "name": "COMBO MASTER",
+    "icon": "⚡",
+    "desc": "コンボ倍率のしきい値を半分に短縮",
+    "effects": { "comboThresholdMult": 0.5 }
+  },
+  {
+    "id": "GUARDIAN",
+    "name": "GUARDIAN",
+    "icon": "🛡️",
+    "desc": "MISSダメージ-50% / 攻撃力-15%",
+    "effects": { "missDamageMult": 0.5, "attackMult": 0.85 }
+  },
+  {
+    "id": "VAMPIRE",
+    "name": "VAMPIRE",
+    "icon": "🩸",
+    "desc": "PERFECT時にわずかにHP回復",
+    "effects": { "healOnPerfect": 8 }
+  },
+  {
+    "id": "BERSERKER",
+    "name": "BERSERKER",
+    "icon": "😈",
+    "desc": "HPが低いほど攻撃力上昇（最大+60%）",
+    "effects": { "lowHpAttackBonus": 0.6 }
+  },
+  {
+    "id": "SLOW_TIME",
+    "name": "SLOW TIME",
+    "icon": "🕰️",
+    "desc": "ノーツ速度-20%で見切りやすく",
+    "effects": { "noteSpeedMult": 0.8 }
+  }
+]

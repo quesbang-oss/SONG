@@ -1,0 +1,68 @@
+[
+  {
+    "id": "safe_pulse_drive",
+    "title": "Pulse Drive",
+    "artist": "YCSB Sound Team (Original)",
+    "license": "自作・フリー利用可（本ゲーム内使用に限る）",
+    "bpm": 128,
+    "duration": 62,
+    "rootFreq": 110,
+    "seed": 1001,
+    "tags": ["BATTLE", "FAST", "POPULAR"]
+  },
+  {
+    "id": "safe_night_circuit",
+    "title": "Night Circuit",
+    "artist": "YCSB Sound Team (Original)",
+    "license": "自作・フリー利用可（本ゲーム内使用に限る）",
+    "bpm": 140,
+    "duration": 58,
+    "rootFreq": 98,
+    "seed": 2002,
+    "tags": ["BOSS", "FAST", "NEW"]
+  },
+  {
+    "id": "safe_glass_meadow",
+    "title": "Glass Meadow",
+    "artist": "YCSB Sound Team (Original)",
+    "license": "自作・フリー利用可（本ゲーム内使用に限る）",
+    "bpm": 92,
+    "duration": 64,
+    "rootFreq": 130,
+    "seed": 3003,
+    "tags": ["RELAX", "NEW"]
+  },
+  {
+    "id": "safe_iron_march",
+    "title": "Iron March",
+    "artist": "YCSB Sound Team (Original)",
+    "license": "自作・フリー利用可（本ゲーム内使用に限る）",
+    "bpm": 150,
+    "duration": 60,
+    "rootFreq": 82,
+    "seed": 4004,
+    "tags": ["BOSS", "BATTLE", "POPULAR"]
+  },
+  {
+    "id": "safe_crimson_arcade",
+    "title": "Crimson Arcade",
+    "artist": "YCSB Sound Team (Original)",
+    "license": "自作・フリー利用可（本ゲーム内使用に限る）",
+    "bpm": 174,
+    "duration": 55,
+    "rootFreq": 116,
+    "seed": 5005,
+    "tags": ["FAST", "BOSS"]
+  },
+  {
+    "id": "safe_paper_moon_walk",
+    "title": "Paper Moon Walk",
+    "artist": "YCSB Sound Team (Original)",
+    "license": "自作・フリー利用可（本ゲーム内使用に限る）",
+    "bpm": 100,
+    "duration": 70,
+    "rootFreq": 104,
+    "seed": 6006,
+    "tags": ["RELAX", "POPULAR"]
+  }
+]

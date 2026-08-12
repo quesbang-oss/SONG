@@ -1,0 +1,11 @@
+{
+  "name": "SONG - YUKU COMMU SONG BATTLE",
+  "short_name": "SONG",
+  "description": "スマホでも遊べる音楽バトルゲーム",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#05040a",
+  "theme_color": "#05040a",
+  "icons": []
+}
